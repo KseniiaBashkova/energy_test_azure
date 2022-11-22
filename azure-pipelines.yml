@@ -1,0 +1,20 @@
+# Maven
+# Build your Java project and run tests with Apache Maven.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/java
+
+trigger:
+- master
+
+pool: MyPool
+
+steps:
+- task: AzureSpringCloud@0
+  inputs:
+    azureSubscription: 'Azure subscription 1(e9e0e00c-37f5-43eb-804d-a7eda84f3b26)'
+    Action: 'Deploy'
+    AzureSpringCloud: '/subscriptions/e9e0e00c-37f5-43eb-804d-a7eda84f3b26/resourceGroups/energy/providers/Microsoft.AppPlatform/Spring/energy-data-storage'
+    AppName: 'energy-data-storage'
+    DeploymentType: 'Artifacts'
+    UseStagingDeployment: false
+    Package: '$(System.DefaultWorkingDirectory)/target/energy-data-storage-0.0.1-SNAPSHOT.jar'

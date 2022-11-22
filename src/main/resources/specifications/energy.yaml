@@ -1,0 +1,316 @@
+openapi: 3.0.0
+
+info:
+  title: MPSV Energy API Specification
+  description: Specification of Energy API provided by MPSV. Called by energy providers.
+  version: 0.3.0
+
+#servers:
+#  - url: 'https://localhost:8888/energy'
+#    description: Energy service server
+#      (url will be updated later)
+
+paths:
+  /pushEnergyData:
+    post:
+      description: Push initial data including energy costs for a given client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/energyData"
+      responses:
+        '201':
+          description: Data stored successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dataId:
+                    description: unique id of the stored data (will be used for pairing when redirecting to MPSV form, etc.)
+                    type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+
+  /checkHousingAllowanceStatus/{clientId}:
+    get:
+      description: The energy provider can check what is the status of its customer's housing allowance request.
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: supplierId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: status provided successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    $ref: "#/components/schemas/applicationStatus"
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Client not found for the given energy provider
+
+  /pairEnergyData:
+    post:
+      description: Pair IK MPSV client and its energy costs data.
+      parameters:
+        - name: energyDataId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ikMpsvId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: status provided successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    $ref: "#/components/schemas/applicationStatus"
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Client not found for the given energy provider
+
+  /getEnergyData:
+    post:
+      description: Get energy data by IK MPSV and priod which the data is requested for.
+      parameters:
+        - name: ikMpsvId
+          in: query
+          required: true
+          schema:
+            type: string
+
+        - name: period
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: status provided successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    $ref: "#/components/schemas/applicationStatus"
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Client not found for the given energy provider
+
+components:
+  schemas:
+    energyData:
+      type: object
+      required: [date, supplierId, gdprAgreementProvided, dataId, client, commodities]
+      properties:
+        date:
+          type: string
+          format: date
+        supplierId:
+          description: each supplier (e.g. CEZ, PRE, ...) will be provided with a unique id by MPSV
+          type: string
+        gdprAgreementProvided:
+          description: Without GDPR agreement from the client, the data canot be provided.
+          type: string
+          format: date
+        client:
+          $ref: "#/components/schemas/client"
+        commodities:
+          type: array
+          items:
+            $ref: "#/components/schemas/commodityData"
+
+
+    client:
+      type: object
+      required: [clientId, firstName, lastName, dateOfBirth, address]
+      properties:
+        clientId:
+          description: unique for a given client within a supplier's realm
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          description: Permanent residence, not point of delivery location
+          allOf:
+            - $ref: "#/components/schemas/address"
+
+
+    address:
+      type: object
+      required: [street, city, zipCode]
+      oneOf:
+        - required: [cpOrCe]
+        - required: [co]
+      properties:
+        street:
+          type: string
+        cpOrCe:
+          description: číslo popisné or číslo evidenční
+          type: string
+        co:
+          description: číslo orientační
+          type: string
+        cityPart:
+          type: string
+        city:
+          type: string
+        zipCode:
+          type: number
+
+
+    commodityData:
+      type: object
+      required: [effectiveDate, pointOfDelivery, statement, payments]
+      properties:
+        effectiveDate:
+          type: string
+          format: date
+        pointOfDelivery:
+          $ref: "#/components/schemas/pointOfDelivery"
+        fixationFrom:
+          type: string
+          format: date
+        fixationTo:
+          type: string
+          format: date
+        statement:
+          $ref: "#/components/schemas/statement"
+        payments:
+          $ref: "#/components/schemas/payments"
+        simulation:
+          $ref: "#/components/schemas/simulation"
+        debt:
+          type: number
+        advancesFor6Months:
+          type: number
+
+
+    pointOfDelivery:
+      description: common structure for electricity and gas, "odběrné místo" in Czech
+      required: [eanOrEic, address, commodity, isMain]
+      type: object
+      properties:
+        eanOrEic:
+          type: number
+        address:
+          $ref: "#/components/schemas/address"
+        flatNumber:
+          description: optional, if the supplier knows it
+          type: string
+        commodity:
+          $ref: "#/components/schemas/commodity_type"
+        isMain:
+          description: Is it the person's main point of delivery for given commodity?
+          type: boolean
+        tariff:
+          type: string
+        heating:
+          description: The type of this attribute will be defined as enum later
+          type: string
+
+
+    statement:
+      type: object
+      required: [date, consumptionPrice, total, advances, balance]
+      properties:
+        date:
+          type: string
+          format: date
+        consumptionAmount:
+          description: in MWh
+          type: number
+        advances:
+          type: number
+        total:
+          type: number
+        balance:
+          type: number
+
+
+    payment:
+      type: object
+      description: Payment for 1 month
+      required: [month, year, amount]
+      properties:
+        month:
+          type: number
+        year:
+          type: number
+        amount:
+          type: number
+
+
+    payments:
+      type: array
+      description: Payments for the given period (at least three months)
+      items:
+        $ref: "#/components/schemas/payment"
+
+
+    simulation:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        consumption:
+          type: number
+        total:
+          type: number
+        balance:
+          type: number
+
+
+    applicationStatus:
+      type: string
+      enum: ["notApplied", "inProgress", "approved", "disapproved"]
+
+
+    commodityType:
+      type: string
+      enum: ["E", "G"]
